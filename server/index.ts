@@ -1,9 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import express from "express";
+import cors from "cors";
 
 const prisma = new PrismaClient();
 const app = express();
 const port = 3001;
+
+app.use(cors());
 app.use(express.json());
 
 // Create a new user
@@ -26,6 +29,34 @@ app.post("/api/users", async (req, res) => {
     res
       .status(500)
       .json({ error: "An error occurred while creating the user." });
+  }
+});
+
+// Username and password verification for signin
+app.post("/api/signin", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    // Validate input
+    if (!username || !password) {
+      res.status(400).json({ message: "Username and password are required." });
+    }
+    // Retrieve user from the database (replace with your DB logic)
+    const user = await prisma.user.findFirst({ where: { username, password } });
+    if (!user) {
+      res.status(401).json({ message: "Invalid username or password." });
+    } else {
+      res.status(200).json({
+        message: "Sign-in successful!",
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+        },
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
