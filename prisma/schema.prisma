@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  email        String       @unique
+  username     String
+  password     String
+  height       Decimal?
+  weight       Decimal?
+  bodyFat      Decimal?
+  friendships  Friendship[]
+  posts        Post[]
+  postLikes    Like[]
+  postComments Comment[]
+}
+
+model Friendship {
+  id    Int    @id @default(autoincrement())
+  users User[]
+}
+
+model Post {
+  id              Int        @id @default(autoincrement())
+  author          User       @relation(fields: [authorId], references: [id])
+  authorId        Int
+  content         String?
+  timestamp       DateTime
+  workoutDuration Decimal?
+  location        String?
+  images          Image[]
+  exercises       Exercise[]
+  comments        Comment[]
+  likes           Like[]
+}
+
+model Image {
+  id         Int     @id @default(autoincrement())
+  objectPath String?
+  post       Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId     Int
+}
+
+model Exercise {
+  id       Int          @id @default(autoincrement())
+  type     ExerciseType @relation(fields: [typeId], references: [id])
+  typeId   Int
+  sets     Int?
+  reps     Int?
+  distance Decimal?
+  pace     Decimal?
+  post     Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId   Int
+}
+
+model ExerciseType {
+  id       Int        @id @default(autoincrement())
+  name     String
+  Exercise Exercise[]
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  timestamp DateTime
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+}
