@@ -94,7 +94,11 @@ app.get("/api/users/:username", async (req, res) => {
     const user = await prisma.user.findFirst({
       where: { username: username as string },
       include: {
-        posts: true,
+        posts: {
+          include: {
+            author: true,
+          },
+        },
       },
     });
     res.status(200).json(user);
