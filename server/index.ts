@@ -332,9 +332,15 @@ app.post("/api/comments", async (req, res) => {
     const postExists = await prisma.post.findUnique({
       where: { id: postId },
     });
+    if (!postExists) {
+      res.status(404).json({ error: "Post not found." });
+    }
     const userExists = await prisma.user.findUnique({
       where: { id: authorId },
     });
+    if (!userExists) {
+      res.status(404).json({ error: "User not found." });
+    }
     const newComment = await prisma.comment.create({
       data: {
         content,
