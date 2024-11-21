@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Exercise } from "@prisma/client";
 import express from "express";
 import cors from "cors";
 
@@ -109,39 +109,26 @@ app.get("/api/users/:username", async (req, res) => {
 
 // Create a post
 app.post("/api/posts", async (req, res) => {
-  const { authorId, content, workoutDuration, location, images, exercises } =
-    req.body;
+  const { username, content, workoutDuration, location } = req.body;
+  const author = await prisma.user.findFirst({
+    where: {
+      username,
+    },
+  });
+  if (!author) {
+    res.status(401).send("User not found");
+    return;
+  }
   try {
-    const userExists = await prisma.user.findUnique({
-      where: { id: authorId },
-    });
     const newPost = await prisma.post.create({
       data: {
         author: {
-          connect: { id: authorId },
+          connect: { id: author.id },
         },
         content,
         timestamp: new Date(),
         workoutDuration: workoutDuration ? parseFloat(workoutDuration) : null,
-        // location,
-        images: images
-          ? {
-              create: images.map((img: { url: string }) => ({
-                url: img.url,
-              })),
-            }
-          : undefined,
-        exercises: exercises
-          ? {
-              create: exercises.map(
-                (exercise: { name: string; reps: number; sets: number }) => ({
-                  name: exercise.name,
-                  sets: exercise.sets,
-                  reps: exercise.reps,
-                })
-              ),
-            }
-          : undefined,
+        location,
       },
     });
     res.status(201).json(newPost);

@@ -54,21 +54,15 @@ model Image {
 }
 
 model Exercise {
-  id       Int          @id @default(autoincrement())
-  type     ExerciseType @relation(fields: [typeId], references: [id])
+  id       Int      @id @default(autoincrement())
+  type     String
   typeId   Int
   sets     Int?
   reps     Int?
   distance Decimal?
   pace     Decimal?
-  post     Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId   Int
-}
-
-model ExerciseType {
-  id       Int        @id @default(autoincrement())
-  name     String
-  Exercise Exercise[]
 }
 
 model Comment {
