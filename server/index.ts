@@ -470,27 +470,9 @@ app.post("/api/posts/:postId/likes", async (req, res) => {
       res.status(404).json({ error: "Post not found." });
     }
 
-    // Verify the user exists
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(userId) },
-    });
-
-    if (!user) {
+    if (!userId) {
       res.status(404).json({ error: "User not found." });
     }
-
-    // Check if the user already liked the post
-    const existingLike = await prisma.like.findFirst({
-      where: {
-        postId: parseInt(postId),
-        authorId: parseInt(userId),
-      },
-    });
-
-    if (existingLike) {
-      res.status(400).json({ error: "You have already liked this post." });
-    }
-
     // Create a like
     const like = await prisma.like.create({
       data: {
