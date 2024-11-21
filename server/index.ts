@@ -156,6 +156,7 @@ app.post("/api/posts", async (req, res) => {
   }
 });
 
+// Follow a user
 app.post("/api/follow/:username", async (req, res) => {
   const { username } = req.params;
   // const { followerUsername, username } = req.body;
@@ -194,6 +195,7 @@ app.post("/api/follow/:username", async (req, res) => {
   }
 });
 
+// Unfollow a user
 app.delete("/api/follow/:username", async (req, res) => {
   const { username } = req.params;
   // const { followerUsername, username } = req.body;
@@ -323,45 +325,6 @@ app.get("/api/posts/:id", async (req, res) => {
   }
 });
 
-// Create a follow
-// app.post("/api/follow", async (req, res) => {
-//   const { user1Id, user2Id } = req.body;
-//   try {
-//     const user1 = await prisma.user.findUnique({ where: { id: user1Id } });
-//     const user2 = await prisma.user.findUnique({ where: { id: user2Id } });
-
-//     const existingFriendship = await prisma.follow.findFirst({
-//       where: {
-//         users: {
-//           every: {
-//             id: { in: [user1Id, user2Id] },
-//           },
-//         },
-//       },
-//     });
-
-//     const friendship = await prisma.friendship.create({
-//       data: {
-//         users: {
-//           connect: [{ id: user1Id }, { id: user2Id }],
-//         },
-//       },
-//     });
-//     if (!existingFriendship) {
-//       res
-//         .status(201)
-//         .json({ message: "Friendship created successfully.", friendship });
-//     } else {
-//       res.status(400).json({ error: "Friendship already exists." });
-//     }
-//   } catch (error) {
-//     console.error(error);
-//     res
-//       .status(500)
-//       .json({ error: "An error occurred while creating the friendship." });
-//   }
-// });
-
 // Create a comment
 app.post("/api/comments", async (req, res) => {
   const { content, postId, authorId } = req.body;
@@ -489,7 +452,7 @@ app.delete("/api/comments/:id", async (req, res) => {
 // });
 
 // Give a like on a post
-app.post("/api/posts/:postId/like", async (req, res) => {
+app.post("/api/posts/:postId/likes", async (req, res) => {
   const { postId } = req.params;
   const { userId } = req.body; // Assuming userId is sent in the request body
 
@@ -549,7 +512,7 @@ app.post("/api/posts/:postId/like", async (req, res) => {
 });
 
 // Delete a like on a post
-app.delete("/api/posts/:postId/like", async (req, res) => {
+app.delete("/api/posts/:postId/likes", async (req, res) => {
   const { postId } = req.params;
   const { userId } = req.body;
 
@@ -582,6 +545,41 @@ app.delete("/api/posts/:postId/like", async (req, res) => {
       .status(500)
       .json({ error: "An error occurred while unliking the post." });
   }
+});
+
+// Get the likes on a post
+app.get("/api/posts/:postId/likes", async (req, res) => {
+  const { postId } = req.params;
+  try {
+    // Verify the post exists
+    const post = await prisma.post.findUnique({
+      where: { id: parseInt(postId) },
+    });
+    if (!post) {
+      res.status(404).json({ error: "Post not found." });
+      return;
+    }
+  } catch (error) {
+    console.error("Error fetching likes:", error);
+    res.status(500).json({ error: "An error occurred while fetching likes." });
+    return;
+  }
+  // Fetch the likes on the post
+  const likes = await prisma.like.findMany({
+    where: {
+      postId: parseInt(postId),
+    },
+    include: {
+      author: {
+        select: {
+          username: true, // Only return the username
+        },
+      },
+    },
+  });
+  const usernames = likes.map((like) => like.author.username);
+
+  res.status(200).json({ usernames });
 });
 
 app.listen(port, () => {
