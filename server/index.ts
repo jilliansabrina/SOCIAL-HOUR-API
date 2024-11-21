@@ -32,6 +32,27 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
+// List all users
+app.get("/api/users", async (req, res) => {
+  try {
+    // Fetch all users from the database
+    const users = await prisma.user.findMany();
+    // Send the user list as a response
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    // Handle errors and send a response
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: (error as Error).message,
+    });
+  }
+});
+
 // Username and password verification for signin
 app.post("/api/signin", async (req, res) => {
   try {
@@ -61,11 +82,17 @@ app.post("/api/signin", async (req, res) => {
 });
 
 // Get all info from a single user for profile page
-app.get("/api/username", async (req, res) => {
-  const authUserId = parseInt(req.headers["authorization"]!);
+app.get("/api/users/:id", async (req, res) => {
+  if (!req.params.id) {
+    res.status(400).json({
+      message: "ID is missing",
+    });
+    return;
+  }
+  const { id } = req.params as any;
   try {
     const user = await prisma.user.findUnique({
-      where: { id: authUserId },
+      where: { id: parseInt(id) },
       include: {
         posts: true,
         friendships: true,
@@ -468,3 +495,15 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
+function async(
+  req: any,
+  res: any
+): import("express-serve-static-core").RequestHandler<
+  {},
+  any,
+  any,
+  import("qs").ParsedQs,
+  Record<string, any>
+> {
+  throw new Error("Function not implemented.");
+}
