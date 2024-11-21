@@ -82,17 +82,17 @@ app.post("/api/signin", async (req, res) => {
 });
 
 // Get all info from a single user for profile page
-app.get("/api/users/:id", async (req, res) => {
-  if (!req.params.id) {
+app.get("/api/users/:username", async (req, res) => {
+  if (!req.params.username) {
     res.status(400).json({
-      message: "ID is missing",
+      message: "Username is missing",
     });
     return;
   }
-  const { id } = req.params as any;
+  const { username } = req.params as any;
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
+    const user = await prisma.user.findFirst({
+      where: { username: username as string },
       include: {
         posts: true,
         friendships: true,
