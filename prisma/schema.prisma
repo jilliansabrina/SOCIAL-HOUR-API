@@ -28,12 +28,15 @@ model User {
   followers    Follow[]  @relation("user-following")
 }
 
+// Unique constraint to prevent duplicate follow relationships
 model Follow {
   id          Int  @id @default(autoincrement())
   follower    User @relation("user-follower", fields: [followerId], references: [id])
   followerId  Int
   following   User @relation("user-following", fields: [followingId], references: [id])
   followingId Int
+
+  @@unique([followerId, followingId])
 }
 
 model Post {

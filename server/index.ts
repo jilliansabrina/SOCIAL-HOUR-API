@@ -89,6 +89,14 @@ app.get("/api/users/:username", async (req, res) => {
     });
     return;
   }
+  const authUsername = req.headers["authorization"];
+  const authUser = await prisma.user.findFirst({
+    where: { username: authUsername as string },
+  });
+  if (!authUser) {
+    res.status(401).json({ message: "User not found." });
+    return;
+  }
   const { username } = req.params as any;
   try {
     const user = await prisma.user.findFirst({
@@ -97,6 +105,11 @@ app.get("/api/users/:username", async (req, res) => {
         posts: {
           include: {
             author: true,
+          },
+        },
+        followers: {
+          where: {
+            followerId: authUser.id,
           },
         },
       },
@@ -140,6 +153,87 @@ app.post("/api/posts", async (req, res) => {
     res
       .status(500)
       .json({ error: "An error ocurred while creating the post." });
+  }
+});
+
+app.post("/api/follow/:username", async (req, res) => {
+  const { username } = req.params;
+  // const { followerUsername, username } = req.body;
+  const authUsername = req.headers["authorization"];
+  const followerUser = await prisma.user.findFirst({
+    where: {
+      username: authUsername,
+    },
+  });
+  const user = await prisma.user.findFirst({
+    where: {
+      username: username,
+    },
+  });
+  if (!followerUser || !user) {
+    res.status(401).send("User not found");
+    return;
+  }
+  try {
+    const newFollow = await prisma.follow.create({
+      data: {
+        follower: {
+          connect: { id: followerUser.id },
+        },
+        following: {
+          connect: { id: user.id },
+        },
+      },
+    });
+    res.status(201).json(newFollow);
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ error: "An error ocurred while creating the follow." });
+  }
+});
+
+app.delete("/api/follow/:username", async (req, res) => {
+  const { username } = req.params;
+  // const { followerUsername, username } = req.body;
+  const authUsername = req.headers["authorization"];
+  const followerUser = await prisma.user.findFirst({
+    where: {
+      username: authUsername,
+    },
+  });
+  const user = await prisma.user.findFirst({
+    where: {
+      username: username,
+    },
+  });
+  if (!followerUser || !user) {
+    res.status(401).send("User not found");
+    return;
+  }
+  try {
+    const follow = await prisma.follow.findFirst({
+      where: {
+        followerId: followerUser.id,
+        followingId: user.id,
+      },
+    });
+    if (!follow) {
+      res.status(404).send("Follow not found");
+      return;
+    }
+    await prisma.follow.delete({
+      where: {
+        id: follow.id,
+      },
+    });
+    res.status(200).json({ message: "Follow deleted successfully." });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ error: "An error ocurred while deleting the follow." });
   }
 });
 
