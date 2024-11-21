@@ -14,22 +14,26 @@ datasource db {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  email        String       @unique
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
   username     String
   password     String
   height       Decimal?
   weight       Decimal?
   bodyFat      Decimal?
-  friendships  Friendship[]
   posts        Post[]
   postLikes    Like[]
   postComments Comment[]
+  following    Follow[]  @relation("user-follower")
+  followers    Follow[]  @relation("user-following")
 }
 
-model Friendship {
-  id    Int    @id @default(autoincrement())
-  users User[]
+model Follow {
+  id          Int  @id @default(autoincrement())
+  follower    User @relation("user-follower", fields: [followerId], references: [id])
+  followerId  Int
+  following   User @relation("user-following", fields: [followingId], references: [id])
+  followingId Int
 }
 
 model Post {
