@@ -275,8 +275,12 @@ app.get("/api/feed", async (req, res) => {
       // },
       // },
       include: {
-        author: { select: { id: true, username: true } }, // Include author details
-        comments: true, // Include comments
+        author: true,
+        comments: {
+          include: {
+            author: true,
+          },
+        }, // Include comments
         likes: true, // Include likes
       },
       orderBy: {
