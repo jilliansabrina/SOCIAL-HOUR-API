@@ -239,6 +239,78 @@ app.delete("/api/follow/:username", async (req, res) => {
   }
 });
 
+// Get all users that a user is following
+app.get("/api/users/:username/following", async (req, res) => {
+  const { username } = req.params;
+  const user = await prisma.user.findUnique({
+    where: {
+      username,
+    },
+    select: {
+      following: {
+        select: {
+          following: {
+            select: {
+              username: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!user) {
+    res.status(401).send("User not found");
+    return;
+  }
+  try {
+    const following = user.following.map(
+      (followee) => followee.following.username
+    );
+    res.status(200).json(following);
+  } catch (error) {
+    console.error("Error fetching following:", error);
+    res
+      .status(500)
+      .json({ error: "An error ocurred while fetching the followees." });
+  }
+});
+
+// Get all users a user is followed by
+app.get("/api/users/:username/followers", async (req, res) => {
+  const { username } = req.params;
+  const user = await prisma.user.findUnique({
+    where: {
+      username,
+    },
+    select: {
+      followers: {
+        select: {
+          follower: {
+            select: {
+              username: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!user) {
+    res.status(401).send("User not found");
+    return;
+  }
+  try {
+    const followedBy = user.followers.map(
+      (follower) => follower.follower.username
+    );
+    res.status(200).json(followedBy);
+  } catch (error) {
+    console.error("Error fetching followers:", error);
+    res
+      .status(500)
+      .json({ error: "An error ocurred while fetching the followers." });
+  }
+});
+
 // Get all posts from friends
 app.get("/api/feed", async (req, res) => {
   const username = req.headers["authorization"]!;
