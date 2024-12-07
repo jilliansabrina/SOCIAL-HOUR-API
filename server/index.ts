@@ -1,4 +1,4 @@
-import { PrismaClient, Exercise } from "@prisma/client";
+import { PrismaClient, ExerciseType } from "@prisma/client";
 import express from "express";
 import cors from "cors";
 
@@ -126,6 +126,8 @@ app.get("/api/users/:username", async (req, res) => {
 // Create a post
 app.post("/api/posts", async (req, res) => {
   const { username, content, location, exercises } = req.body;
+  console.log("Request Body:", req.body);
+
   const author = await prisma.user.findFirst({
     where: {
       username,
@@ -135,6 +137,13 @@ app.post("/api/posts", async (req, res) => {
     res.status(401).send("User not found");
     return;
   }
+  if (exercises && !Array.isArray(exercises)) {
+    res.status(400).json({ error: "'exercises' must be an array" });
+  }
+
+  // Default exercises to an empty array if undefined
+  const exercisesArray = Array.isArray(exercises) ? exercises : [];
+
   try {
     const newPost = await prisma.post.create({
       data: {
@@ -145,7 +154,7 @@ app.post("/api/posts", async (req, res) => {
         timestamp: new Date(),
         location,
         exercises: {
-          create: exercises.map(
+          create: exercisesArray.map(
             (exercise: {
               type: string;
               subcategory?: string;
@@ -155,7 +164,7 @@ app.post("/api/posts", async (req, res) => {
               pace?: number;
               weight?: number;
             }) => ({
-              type: exercise.type,
+              type: exercise.type as ExerciseType,
               subcategory: exercise.subcategory || null,
               sets: exercise.sets || null,
               reps: exercise.reps || null,
