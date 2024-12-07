@@ -125,7 +125,7 @@ app.get("/api/users/:username", async (req, res) => {
 
 // Create a post
 app.post("/api/posts", async (req, res) => {
-  const { username, content, workoutDuration, location } = req.body;
+  const { username, content, location, exercises } = req.body;
   const author = await prisma.user.findFirst({
     where: {
       username,
@@ -143,8 +143,28 @@ app.post("/api/posts", async (req, res) => {
         },
         content,
         timestamp: new Date(),
-        workoutDuration: workoutDuration ? parseFloat(workoutDuration) : null,
         location,
+        exercises: {
+          create: exercises.map(
+            (exercise: {
+              type: string;
+              subcategory?: string;
+              sets?: number;
+              reps?: number;
+              distance?: number;
+              pace?: number;
+              weight?: number;
+            }) => ({
+              type: exercise.type,
+              subcategory: exercise.subcategory || null,
+              sets: exercise.sets || null,
+              reps: exercise.reps || null,
+              distance: exercise.distance || null,
+              pace: exercise.pace || null,
+              weight: exercise.weight || null,
+            })
+          ),
+        },
       },
     });
     res.status(201).json(newPost);
