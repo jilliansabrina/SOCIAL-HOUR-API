@@ -75,6 +75,7 @@ model Exercise {
   distance    Decimal?
   pace        Decimal?
   weight      Decimal?
+  duration    Decimal?
   post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId      Int
 }

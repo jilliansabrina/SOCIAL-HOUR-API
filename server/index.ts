@@ -162,6 +162,7 @@ app.post("/api/posts", async (req, res) => {
               sets?: number;
               reps?: number;
               distance?: number;
+              duration?: number;
               pace?: number;
               weight?: number;
             }) => ({
@@ -170,6 +171,7 @@ app.post("/api/posts", async (req, res) => {
               sets: exercise.sets || null,
               reps: exercise.reps || null,
               distance: exercise.distance || null,
+              duration: exercise.duration || null,
               pace: exercise.pace || null,
               weight: exercise.weight || null,
             })
@@ -378,6 +380,7 @@ app.get("/api/feed", async (req, res) => {
       // },
       include: {
         author: true,
+        exercises: true,
         comments: {
           include: {
             author: true,
