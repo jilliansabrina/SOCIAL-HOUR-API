@@ -125,7 +125,7 @@ app.get("/api/users/:username", async (req, res) => {
 
 // Create a post
 app.post("/api/posts", async (req, res) => {
-  const { username, content, location, exercises } = req.body;
+  const { username, workoutType, content, location, exercises } = req.body;
   console.log("Request Body:", req.body);
 
   const author = await prisma.user.findFirst({
@@ -150,6 +150,7 @@ app.post("/api/posts", async (req, res) => {
         author: {
           connect: { id: author.id },
         },
+        workoutType,
         content,
         timestamp: new Date(),
         location,
