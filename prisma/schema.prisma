@@ -40,17 +40,25 @@ model Follow {
 }
 
 model Post {
-  id          Int           @id @default(autoincrement())
-  author      User          @relation(fields: [authorId], references: [id])
-  authorId    Int
-  workoutType ExerciseType?
-  content     String?
-  timestamp   DateTime
-  location    String?
-  images      Image[]
-  exercises   Exercise[]
-  comments    Comment[]
-  likes       Like[]
+  id        Int       @id @default(autoincrement())
+  author    User      @relation(fields: [authorId], references: [id])
+  authorId  Int
+  content   String?
+  timestamp DateTime
+  location  String?
+  images    Image[]
+  workouts  Workout[]
+  comments  Comment[]
+  likes     Like[]
+}
+
+model Workout {
+  id        Int         @id @default(autoincrement())
+  type      WorkoutType
+  subtype   String?
+  post      Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  exercises Exercise[]
 }
 
 model Image {
@@ -60,7 +68,7 @@ model Image {
   postId     Int
 }
 
-enum ExerciseType {
+enum WorkoutType {
   STRENGTH
   CARDIO
   FLEXIBILITY
@@ -68,16 +76,16 @@ enum ExerciseType {
 }
 
 model Exercise {
-  id          Int      @id @default(autoincrement())
-  subcategory String?
-  sets        Int?
-  reps        Int?
-  distance    Decimal?
-  pace        Decimal?
-  weight      Decimal?
-  duration    Decimal?
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId      Int
+  id        Int      @id @default(autoincrement())
+  name      String
+  sets      Int?
+  reps      Int?
+  distance  Decimal?
+  pace      Decimal?
+  weight    Decimal?
+  duration  Decimal?
+  workout   Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  workoutId Int
 }
 
 model Comment {

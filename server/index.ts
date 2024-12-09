@@ -1,4 +1,4 @@
-import { PrismaClient, ExerciseType } from "@prisma/client";
+import { PrismaClient, Exercise } from "@prisma/client";
 import express from "express";
 import cors from "cors";
 
@@ -125,7 +125,7 @@ app.get("/api/users/:username", async (req, res) => {
 
 // Create a post
 app.post("/api/posts", async (req, res) => {
-  const { username, workoutType, content, location, exercises } = req.body;
+  const { username, content, location, workouts } = req.body;
   console.log("Request Body:", req.body);
 
   const author = await prisma.user.findFirst({
@@ -137,12 +137,10 @@ app.post("/api/posts", async (req, res) => {
     res.status(401).send("User not found");
     return;
   }
-  if (exercises && !Array.isArray(exercises)) {
-    res.status(400).json({ error: "'exercises' must be an array" });
+  if (!workouts || !Array.isArray(workouts)) {
+    res.status(400).json({ error: "'workouts' must be a valid array." });
+    return;
   }
-
-  // Default exercises to an empty array if undefined
-  const exercisesArray = Array.isArray(exercises) ? exercises : [];
 
   try {
     const newPost = await prisma.post.create({
@@ -150,32 +148,25 @@ app.post("/api/posts", async (req, res) => {
         author: {
           connect: { id: author.id },
         },
-        workoutType,
         content,
         timestamp: new Date(),
         location,
-        exercises: {
-          create: exercisesArray.map(
-            (exercise: {
-              type: string;
-              subcategory?: string;
-              sets?: number;
-              reps?: number;
-              distance?: number;
-              duration?: number;
-              pace?: number;
-              weight?: number;
-            }) => ({
-              type: exercise.type as ExerciseType,
-              subcategory: exercise.subcategory || null,
-              sets: exercise.sets || null,
-              reps: exercise.reps || null,
-              distance: exercise.distance || null,
-              duration: exercise.duration || null,
-              pace: exercise.pace || null,
-              weight: exercise.weight || null,
-            })
-          ),
+        workouts: {
+          create: workouts.map((workout) => ({
+            type: workout.type,
+            subtype: workout.subtype || null,
+            exercises: {
+              create: workout.exercises.map((exercise: Exercise) => ({
+                name: exercise.name,
+                sets: exercise.sets || null,
+                reps: exercise.reps || null,
+                distance: exercise.distance || null,
+                pace: exercise.pace || null,
+                weight: exercise.weight || null,
+                duration: exercise.duration || null,
+              })),
+            },
+          })),
         },
       },
     });
@@ -343,58 +334,56 @@ app.get("/api/users/:username/followers", async (req, res) => {
   }
 });
 
-// Get all posts from friends
-app.get("/api/feed", async (req, res) => {
-  const username = req.headers["authorization"]!;
+import { Request, Response } from "express";
+
+app.get("/api/feed", async (req: Request, res: Response) => {
+  const username = req.headers["authorization"] as string;
+  if (!username) {
+    res.status(400).json({ error: "Authorization header is required." });
+    return; // Ensure no further execution after response
+  }
+
   try {
-    // Ensure the user exists
     const user = await prisma.user.findFirst({
       where: { username },
+      include: {
+        following: {
+          select: {
+            followingId: true, // Include only the `followingId` field
+          },
+        },
+      },
     });
 
     if (!user) {
       res.status(404).json({ error: "User not found." });
+      return; // Prevent further execution
     }
 
-    // Fetch posts from the user's friends
+    const followingIds = user.following.map((follow) => follow.followingId);
+
     const friendPosts = await prisma.post.findMany({
-      // where: {
-      // author: {
-      //   OR: [
-      //     {
-      //       sentRequests: {
-      //         some: {
-      //           id: user?.id,
-      //         },
-      //       },
-      //     },
-      //     {
-      //       receivedRequests: {
-      //         some: {
-      //           id: user?.id,
-      //         },
-      //       },
-      //     },
-      //   ],
-      // },
-      // },
+      where: {
+        authorId: { in: followingIds }, // Use the list of `followingId`
+      },
       include: {
         author: true,
-        exercises: true,
-        comments: {
+        workouts: {
           include: {
-            author: true,
+            exercises: true,
           },
-        }, // Include comments
-        likes: true, // Include likes
+        },
+        comments: true,
+        likes: true,
       },
       orderBy: {
-        timestamp: "desc", // Order posts by timestamp
+        timestamp: "desc",
       },
     });
 
-    if (friendPosts.length === 0) {
+    if (!friendPosts.length) {
       res.status(404).json({ error: "No posts found from user's friends." });
+      return; // Ensure no further execution
     }
 
     res.status(200).json(friendPosts);
@@ -422,7 +411,11 @@ app.get("/api/posts/:id", async (req, res) => {
           },
         },
         images: true,
-        exercises: true,
+        workouts: {
+          include: {
+            exercises: true,
+          },
+        },
       },
     });
     res.status(200).json(post);
@@ -510,61 +503,6 @@ app.delete("/api/comments/:id", async (req, res) => {
       .json({ error: "An error occurred while deleting the comment." });
   }
 });
-
-// Delete a friendship
-// app.delete("/api/friendships/:id", async (req, res) => {
-//   const { id } = req.params;
-
-//   try {
-//     const friendship = await prisma.friendship.findUnique({
-//       where: { id: parseInt(id) },
-//     });
-//     if (!friendship) {
-//       res.status(404).json({ error: "Friendship not found." });
-//     }
-//     await prisma.friendship.delete({
-//       where: { id: parseInt(id) },
-//     });
-
-//     res.status(200).json({ message: "Friendship deleted successfully." });
-//   } catch (error) {
-//     console.error(error);
-//     res
-//       .status(500)
-//       .json({ error: "An error occurred while deleting the friendship." });
-//   }
-// });
-
-// Get all friendships from a user
-// app.get("/api/users/:id/friendships", async (req, res) => {
-//   const authUserId = parseInt(req.headers["authorization"]!);
-//   try {
-//     const user = await prisma.user.findUnique({
-//       where: { id: authUserId },
-//     });
-//     if (!user) {
-//       res.status(404).json({ error: "User not found." });
-//     }
-//     const friendships = await prisma.friendship.findMany({
-//       where: {
-//         users: {
-//           some: { id: authUserId },
-//         },
-//       },
-//       include: {
-//         users: {
-//           select: { id: true, username: true, email: true }, // Include relevant user info
-//         },
-//       },
-//     });
-//     res.status(200).json(friendships);
-//   } catch (error) {
-//     console.error(error);
-//     res
-//       .status(500)
-//       .json({ error: "An error occurred while fetching friendships." });
-//   }
-// });
 
 // Give a like on a post
 app.post("/api/posts/:postId/likes", async (req, res) => {
