@@ -150,6 +150,16 @@ app.get("/api/users/:username", async (req, res) => {
     const user = await prisma.user.findFirst({
       where: { username: username as string },
       include: {
+        followers: {
+          include: {
+            follower: true, // Include follower details
+          },
+        },
+        following: {
+          include: {
+            following: true, // Include following details
+          },
+        },
         posts: {
           include: {
             author: true,
@@ -164,16 +174,6 @@ app.get("/api/users/:username", async (req, res) => {
           },
           orderBy: {
             timestamp: "desc", // Order posts by timestamp in descending order
-          },
-        },
-        followers: {
-          include: {
-            follower: true, // Include follower details
-          },
-        },
-        following: {
-          include: {
-            following: true, // Include following details
           },
         },
       },
