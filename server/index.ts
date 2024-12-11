@@ -8,7 +8,6 @@ const app = express();
 const port = 3001;
 
 const multer = require("multer");
-import { Multer } from "multer";
 const upload = multer({ dest: "uploads/" });
 const path = require("path");
 
@@ -24,9 +23,6 @@ app.post("/api/users", async (req, res) => {
         email,
         username,
         password,
-        height: height ? parseFloat(height) : null, // Ensure Decimal fields are numbers
-        weight: weight ? parseFloat(weight) : null,
-        bodyFat: bodyFat ? parseFloat(bodyFat) : null,
       },
     });
     res.status(201).json(newUser); // Return the created user
@@ -35,6 +31,52 @@ app.post("/api/users", async (req, res) => {
     res
       .status(500)
       .json({ error: "An error occurred while creating the user." });
+  }
+});
+
+import { Prisma } from "@prisma/client";
+
+app.patch("/api/users/:username", async (req, res) => {
+  try {
+    const { newUsername } = req.body;
+    const authUsername = req.headers["authorization"];
+
+    if (!authUsername) {
+      res.status(401).json({ error: "Authorization header is required." });
+      return;
+    }
+
+    if (!newUsername) {
+      res.status(400).json({ error: "New username is required." });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { username: authUsername },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { username: newUsername },
+    });
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    // Cast error as PrismaClientKnownRequestError
+    if ((error as Prisma.PrismaClientKnownRequestError).code === "P2002") {
+      res.status(400).json({ error: "Username is already in use." });
+      return;
+    }
+
+    console.error("Error updating username:", error);
+    res
+      .status(500)
+      .json({ error: "An error occurred while updating the username." });
   }
 });
 
@@ -149,8 +191,6 @@ app.get("/api/users/:username", async (req, res) => {
 app.post("/api/posts", upload.array("images"), async (req, res) => {
   const { username, content, location, workouts } = req.body;
   const files = req.files as Express.Multer.File[];
-  console.log("Request Body:", req.body);
-  console.log("Uploaded Files:", files);
 
   let myWorkout = JSON.parse(workouts);
 
@@ -165,7 +205,6 @@ app.post("/api/posts", upload.array("images"), async (req, res) => {
   }
   if (!myWorkout || !Array.isArray(myWorkout)) {
     res.status(400).json({ error: "'workouts' must be a valid array." });
-    console.log("Workouts:", myWorkout);
     return;
   }
   const savedFiles = files.map((file) => {
@@ -677,6 +716,3 @@ function async(
 }
 // Serve static files
 app.use("/uploads", express.static(path.resolve(__dirname, "../uploads")));
-
-// Log the uploads directory to confirm the path
-console.log("Static uploads directory:", path.resolve(__dirname, "../uploads"));
