@@ -1,10 +1,16 @@
 import { PrismaClient, Exercise } from "@prisma/client";
 import express from "express";
 import cors from "cors";
+import * as fs from "fs";
 
 const prisma = new PrismaClient();
 const app = express();
 const port = 3001;
+
+const multer = require("multer");
+import { Multer } from "multer";
+const upload = multer({ dest: "uploads/" });
+const path = require("path");
 
 app.use(cors());
 app.use(express.json());
@@ -105,11 +111,27 @@ app.get("/api/users/:username", async (req, res) => {
         posts: {
           include: {
             author: true,
+            comments: true,
+            likes: true,
+            images: true,
+            workouts: {
+              include: {
+                exercises: true, // Include exercises in the response
+              },
+            },
+          },
+          orderBy: {
+            timestamp: "desc", // Order posts by timestamp in descending order
           },
         },
         followers: {
-          where: {
-            followerId: authUser.id,
+          include: {
+            follower: true, // Include follower details
+          },
+        },
+        following: {
+          include: {
+            following: true, // Include following details
           },
         },
       },
@@ -124,9 +146,13 @@ app.get("/api/users/:username", async (req, res) => {
 });
 
 // Create a post
-app.post("/api/posts", async (req, res) => {
+app.post("/api/posts", upload.array("images"), async (req, res) => {
   const { username, content, location, workouts } = req.body;
+  const files = req.files as Express.Multer.File[];
   console.log("Request Body:", req.body);
+  console.log("Uploaded Files:", files);
+
+  let myWorkout = JSON.parse(workouts);
 
   const author = await prisma.user.findFirst({
     where: {
@@ -137,10 +163,21 @@ app.post("/api/posts", async (req, res) => {
     res.status(401).send("User not found");
     return;
   }
-  if (!workouts || !Array.isArray(workouts)) {
+  if (!myWorkout || !Array.isArray(myWorkout)) {
     res.status(400).json({ error: "'workouts' must be a valid array." });
+    console.log("Workouts:", myWorkout);
     return;
   }
+  const savedFiles = files.map((file) => {
+    const extension = path.extname(file.originalname) || ".png"; // Default to PNG if no extension
+    const filename = `${file.filename}${extension}`;
+    const newPath = path.join(file.destination, filename);
+
+    fs.renameSync(file.path, newPath); // Rename file with correct extension
+    return {
+      objectPath: newPath, // Save new path to the database
+    };
+  });
 
   try {
     const newPost = await prisma.post.create({
@@ -152,7 +189,7 @@ app.post("/api/posts", async (req, res) => {
         timestamp: new Date(),
         location,
         workouts: {
-          create: workouts.map((workout) => ({
+          create: myWorkout.map((workout) => ({
             type: workout.type,
             subtype: workout.subtype || null,
             exercises: {
@@ -167,6 +204,9 @@ app.post("/api/posts", async (req, res) => {
               })),
             },
           })),
+        },
+        images: {
+          create: savedFiles,
         },
       },
     });
@@ -362,9 +402,11 @@ app.get("/api/feed", async (req: Request, res: Response) => {
 
     const followingIds = user.following.map((follow) => follow.followingId);
 
+    const authorIds = [...followingIds, user.id];
+
     const friendPosts = await prisma.post.findMany({
       where: {
-        authorId: { in: followingIds }, // Use the list of `followingId`
+        authorId: { in: authorIds }, // Use the list of `followingId`
       },
       include: {
         author: true,
@@ -375,6 +417,7 @@ app.get("/api/feed", async (req: Request, res: Response) => {
         },
         comments: true,
         likes: true,
+        images: true,
       },
       orderBy: {
         timestamp: "desc",
@@ -632,3 +675,8 @@ function async(
 > {
   throw new Error("Function not implemented.");
 }
+// Serve static files
+app.use("/uploads", express.static(path.resolve(__dirname, "../uploads")));
+
+// Log the uploads directory to confirm the path
+console.log("Static uploads directory:", path.resolve(__dirname, "../uploads"));

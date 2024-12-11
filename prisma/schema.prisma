@@ -72,6 +72,8 @@ enum WorkoutType {
   STRENGTH
   CARDIO
   FLEXIBILITY
+  CLASSES
+  SPORTS
   OTHER
 }
 
