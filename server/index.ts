@@ -189,72 +189,102 @@ app.get("/api/users/:username", async (req, res) => {
 
 // Create a post
 app.post("/api/posts", upload.array("images"), async (req, res) => {
-  const { username, content, location, workouts } = req.body;
-  const files = req.files as Express.Multer.File[];
-
-  let myWorkout = JSON.parse(workouts);
-
-  const author = await prisma.user.findFirst({
-    where: {
-      username,
-    },
-  });
-  if (!author) {
-    res.status(401).send("User not found");
-    return;
-  }
-  if (!myWorkout || !Array.isArray(myWorkout)) {
-    res.status(400).json({ error: "'workouts' must be a valid array." });
-    return;
-  }
-  const savedFiles = files.map((file) => {
-    const extension = path.extname(file.originalname) || ".png"; // Default to PNG if no extension
-    const filename = `${file.filename}${extension}`;
-    const newPath = path.join(file.destination, filename);
-
-    fs.renameSync(file.path, newPath); // Rename file with correct extension
-    return {
-      objectPath: newPath, // Save new path to the database
-    };
-  });
-
   try {
+    const { username, content, location, workouts } = req.body;
+
+    // Validate required fields
+    if (!username || !content) {
+      res.status(400).json({ error: "Username and content are required." });
+      return;
+    }
+
+    // Parse and validate workouts
+    let myWorkout;
+    try {
+      myWorkout = JSON.parse(workouts); // Parse workouts from string to JSON
+    } catch (error) {
+      res
+        .status(400)
+        .json({ error: "'workouts' must be a valid JSON string." });
+      return;
+    }
+
+    if (!Array.isArray(myWorkout)) {
+      res.status(400).json({ error: "'workouts' must be an array." });
+      return;
+    }
+
+    console.log("Parsed workouts:", myWorkout); // Log parsed workouts for debugging
+
+    // Find the author in the database
+    const author = await prisma.user.findFirst({ where: { username } });
+    if (!author) {
+      res.status(401).json({ error: "User not found" });
+      return;
+    }
+
+    // Process uploaded files
+    const files = req.files as Express.Multer.File[];
+    const savedFiles = files.map((file) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      const filename = `${file.filename}${extension}`;
+      const newPath = path.join(file.destination, filename);
+
+      fs.renameSync(file.path, newPath); // Rename file to include extension
+      return { objectPath: newPath }; // Match the Image model schema
+    });
+
+    // Create the post
     const newPost = await prisma.post.create({
       data: {
-        author: {
-          connect: { id: author.id },
-        },
+        author: { connect: { id: author.id } },
         content,
         timestamp: new Date(),
-        location,
+        location: location || null, // Handle optional location
         workouts: {
           create: myWorkout.map((workout) => ({
             type: workout.type,
             subtype: workout.subtype || null,
             exercises: {
-              create: workout.exercises.map((exercise: Exercise) => ({
-                name: exercise.name,
-                sets: exercise.sets || null,
-                reps: exercise.reps || null,
-                distance: exercise.distance || null,
-                pace: exercise.pace || null,
-                weight: exercise.weight || null,
-                duration: exercise.duration || null,
-              })),
+              create: workout.exercises.map(
+                (exercise: {
+                  name: string;
+                  sets: number;
+                  reps: number;
+                  distance: number;
+                  pace: number;
+                  weight: number;
+                  duration: number;
+                }) => ({
+                  name: exercise.name,
+                  sets: exercise.sets || null,
+                  reps: exercise.reps || null,
+                  distance: exercise.distance || null,
+                  pace: exercise.pace || null,
+                  weight: exercise.weight || null,
+                  duration: exercise.duration || null,
+                })
+              ),
             },
           })),
         },
         images: {
-          create: savedFiles,
+          create: savedFiles.map((file) => ({
+            objectPath: file.objectPath, // Save the file path
+          })),
         },
       },
     });
+
+    // Respond with the created post
     res.status(201).json(newPost);
   } catch (error) {
-    console.error(error);
+    console.error("Error creating post:", error);
     res
       .status(500)
-      .json({ error: "An error ocurred while creating the post." });
+      .json({ error: "An error occurred while creating the post." });
+  } finally {
+    res.end();
   }
 });
 
@@ -697,6 +727,108 @@ app.get("/api/posts/:postId/likes", async (req, res) => {
   const usernames = likes.map((like) => like.author.username);
 
   res.status(200).json({ usernames });
+});
+
+// Get all posts for a specific user within a specific year
+app.get("/api/users/:username/posts", async (req, res) => {
+  const { year } = req.query;
+  const { username } = req.params;
+
+  if (!username || !year || isNaN(parseInt(year as string))) {
+    res.status(400).json({ error: "A valid username and year are required." });
+    return;
+  }
+
+  const startDate = new Date(`${year}-01-01T00:00:00Z`);
+  const endDate = new Date(`${year}-12-31T23:59:59Z`);
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { username },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    const posts = await prisma.post.findMany({
+      where: {
+        authorId: user.id,
+        timestamp: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        timestamp: true, // Only select the timestamp field
+      },
+    });
+
+    // Transform and group posts by date
+    // Transform and group posts by date
+    const postCounts = posts.reduce<Record<string, number>>((acc, post) => {
+      const date = new Date(post.timestamp).toISOString().split("T")[0]; // Format as YYYY-MM-DD
+      acc[date] = (acc[date] || 0) + 1; // Increment count for the date
+      return acc;
+    }, {});
+
+    // Convert the grouped data into the desired format
+    const formattedPosts = Object.entries(postCounts).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
+    res.status(200).json(formattedPosts);
+  } catch (error) {
+    console.error("Error fetching user posts for heatmap:", error);
+    res.status(500).json({ error: "An error occurred while fetching posts." });
+  }
+});
+
+app.get("/api/users/:username/workout-stats", async (req, res) => {
+  const { username } = req.params;
+
+  if (!username) {
+    res.status(400).json({ error: "Username is required." });
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { username },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    const workoutStats = await prisma.workout.groupBy({
+      by: ["type", "subtype"],
+      _count: {
+        _all: true,
+      },
+      where: {
+        post: {
+          authorId: user.id, // Filter workouts by the user's posts
+        },
+      },
+    });
+
+    const formattedData = workoutStats.map((stat) => ({
+      type: stat.type,
+      subtype: stat.subtype || "Other",
+      count: stat._count._all,
+    }));
+
+    res.status(200).json(formattedData);
+  } catch (error) {
+    console.error("Error fetching workout stats:", error);
+    res
+      .status(500)
+      .json({ error: "An error occurred while fetching workout stats." });
+  }
 });
 
 app.listen(port, () => {
