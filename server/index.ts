@@ -163,7 +163,7 @@ app.get("/api/users/:username", async (req, res) => {
         posts: {
           include: {
             author: true,
-            comments: true,
+            comments: { include: { author: true } },
             likes: true,
             images: true,
             workouts: {
@@ -573,6 +573,31 @@ app.post("/api/comments", async (req, res) => {
     res
       .status(500)
       .json({ error: "An error occurred while creating the comment." });
+  }
+});
+
+// Get comments for a specific post
+app.get("/api/posts/:postId/comments", async (req, res) => {
+  const { postId } = req.params;
+
+  try {
+    const comments = await prisma.comment.findMany({
+      where: { postId: parseInt(postId) },
+      include: {
+        author: { select: { id: true, username: true } },
+      },
+    });
+
+    if (!comments) {
+      res.status(404).json({ error: "No comments found for this post." });
+    }
+
+    res.status(200).json(comments);
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    res
+      .status(500)
+      .json({ error: "An error occurred while fetching comments." });
   }
 });
 
